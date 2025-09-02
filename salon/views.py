@@ -1,376 +1,303 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.views import View
-from django.views.generic import ListView, DetailView, CreateView, UpdateView
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
-from django.utils import timezone
-from django.http import JsonResponse, HttpResponseForbidden
 from django.contrib import messages
-from django.db.models import Q
-from datetime import datetime, timedelta
-import json
+from django.db.models import Q, Avg, Count
+from django.core.paginator import Paginator
+from .models import Salon, Master, Service, MasterService
+from .forms import MasterForm, ServiceForm, SalonForm, MasterServiceForm
 
-from .models import Service, Master, PortfolioItem, Client, Appointment, Review, WorkingHours
-from .forms import AppointmentForm, ReviewForm, ClientProfileForm
-
-# Utility functions for permission checks
-def is_client(user):
-    return hasattr(user, 'client') and user.is_authenticated
-
-def is_master(user):
-    return hasattr(user, 'master') and user.is_authenticated
-
-def is_administrator(user):
-    return user.is_staff or user.is_superuser
-
-# Public views
-class ServiceListView(ListView):
-    model = Service
-    template_name = 'services/service_list.html'
-    context_object_name = 'services'
+# Salon Views
+class SalonListView(ListView):
+    model = Salon
+    template_name = 'salon_list.html'
+    context_object_name = 'salons'
+    paginate_by = 10
     
     def get_queryset(self):
-        return Service.objects.filter(is_active=True)
+        queryset = Salon.objects.filter(is_active=True)
+        return queryset
 
-class ServiceDetailView(DetailView):
-    model = Service
-    template_name = 'services/service_detail.html'
-    context_object_name = 'service'
+class SalonDetailView(DetailView):
+    model = Salon
+    template_name = 'salon_detail.html'
+    context_object_name = 'salon'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['masters'] = self.object.masters.filter(is_active=True)
         return context
 
+class SalonCreateView(CreateView):
+    model = Salon
+    form_class = SalonForm
+    template_name = 'salon_form.html'
+    success_url = reverse_lazy('salon_list')
+    
+    def form_valid(self, form):
+        messages.success(self.request, 'Салон успешно создан!')
+        return super().form_valid(form)
+
+class SalonUpdateView(UpdateView):
+    model = Salon
+    form_class = SalonForm
+    template_name = 'salon_form.html'
+    
+    def get_success_url(self):
+        return reverse_lazy('salon_detail', kwargs={'pk': self.object.pk})
+    
+    def form_valid(self, form):
+        messages.success(self.request, 'Салон успешно обновлен!')
+        return super().form_valid(form)
+
+class SalonDeleteView(DeleteView):
+    model = Salon
+    template_name = 'salon_confirm_delete.html'
+    success_url = reverse_lazy('salon_list')
+    
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, 'Салон успешно удален!')
+        return super().delete(request, *args, **kwargs)
+
+# Master Views
 class MasterListView(ListView):
     model = Master
-    template_name = 'masters/master_list.html'
+    template_name = 'master_list.html'
     context_object_name = 'masters'
+    paginate_by = 12
     
     def get_queryset(self):
-        return Master.objects.filter(is_active=True).select_related('user')
-
-class MasterDetailView(DetailView):
-    model = Master
-    template_name = 'masters/master_detail.html'
-    context_object_name = 'master'
+        queryset = Master.objects.filter(is_active=True).select_related('salon')
+        
+        # Фильтрация по специализации
+        specialization = self.request.GET.get('specialization')
+        if specialization:
+            queryset = queryset.filter(specialization=specialization)
+        
+        # Фильтрация по салону
+        salon_id = self.request.GET.get('salon')
+        if salon_id:
+            queryset = queryset.filter(salon_id=salon_id)
+        
+        # Поиск
+        search = self.request.GET.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(salon__name__icontains=search)
+            )
+        
+        return queryset.order_by('-rating', 'last_name')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['portfolio'] = self.object.portfolio.all()[:6]
-        context['services'] = self.object.services.filter(is_active=True)
-        context['reviews'] = Review.objects.filter(
-            master=self.object, 
-            is_approved=True
-        )[:5]
+        context['salons'] = Salon.objects.filter(is_active=True)
+        context['specializations'] = Master.SPECIALIZATION_CHOICES
         return context
 
-# Client views
-class ClientDashboardView(LoginRequiredMixin, UserPassesTestMixin, View):
-    template_name = 'clients/dashboard.html'
-    
-    def test_func(self):
-        return is_client(self.request.user)
-    
-    def get(self, request):
-        client = request.user.client
-        appointments = Appointment.objects.filter(client=client).order_by('-appointment_date')
-        context = {
-            'client': client,
-            'appointments': appointments,
-            'upcoming_appointments': appointments.filter(
-                appointment_date__gte=timezone.now()
-            )[:5],
-            'past_appointments': appointments.filter(
-                appointment_date__lt=timezone.now()
-            )[:10]
-        }
-        return render(request, self.template_name, context)
-
-class CreateAppointmentView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
-    model = Appointment
-    form_class = AppointmentForm
-    template_name = 'clients/create_appointment.html'
-    success_url = reverse_lazy('client_dashboard')
-    
-    def test_func(self):
-        return is_client(self.request.user)
-    
-    def form_valid(self, form):
-        form.instance.client = self.request.user.client
-        form.instance.status = 'pending'
-        messages.success(self.request, 'Запись успешно создана! Ожидайте подтверждения.')
-        return super().form_valid(form)
-    
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['client'] = self.request.user.client
-        return kwargs
-
-class ClientAppointmentHistoryView(LoginRequiredMixin, UserPassesTestMixin, ListView):
-    model = Appointment
-    template_name = 'clients/appointment_history.html'
-    context_object_name = 'appointments'
-    
-    def test_func(self):
-        return is_client(self.request.user)
+class MasterDetailView(DetailView):
+    model = Master
+    template_name = 'master_detail.html'
+    context_object_name = 'master'
     
     def get_queryset(self):
-        return Appointment.objects.filter(
-            client=self.request.user.client
-        ).order_by('-appointment_date')
-
-class CreateReviewView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
-    model = Review
-    form_class = ReviewForm
-    template_name = 'clients/create_review.html'
-    success_url = reverse_lazy('client_dashboard')
+        return Master.objects.select_related('salon').prefetch_related('master_services__service')
     
-    def test_func(self):
-        return is_client(self.request.user)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['services'] = self.object.master_services.filter(is_available=True)
+        return context
+
+class MasterCreateView(CreateView):
+    model = Master
+    form_class = MasterForm
+    template_name = 'master_form.html'
+    success_url = reverse_lazy('master_list')
     
     def form_valid(self, form):
-        form.instance.client = self.request.user.client
-        messages.success(self.request, 'Отзыв отправлен на модерацию!')
+        messages.success(self.request, 'Мастер успешно добавлен!')
         return super().form_valid(form)
 
-# Master views
-class MasterDashboardView(LoginRequiredMixin, UserPassesTestMixin, View):
-    template_name = 'masters/dashboard.html'
+class MasterUpdateView(UpdateView):
+    model = Master
+    form_class = MasterForm
+    template_name = 'master_form.html'
     
-    def test_func(self):
-        return is_master(self.request.user)
+    def get_success_url(self):
+        return reverse_lazy('master_detail', kwargs={'pk': self.object.pk})
     
-    def get(self, request):
-        master = request.user.master
-        today = timezone.now().date()
-        
-        context = {
-            'master': master,
-            'today_appointments': Appointment.objects.filter(
-                master=master,
-                appointment_date__date=today,
-                status__in=['confirmed', 'pending']
-            ).order_by('appointment_date'),
-            'upcoming_appointments': Appointment.objects.filter(
-                master=master,
-                appointment_date__date__gt=today,
-                status__in=['confirmed', 'pending']
-            ).order_by('appointment_date')[:10],
-            'recent_appointments': Appointment.objects.filter(
-                master=master,
-                appointment_date__date__lt=today
-            ).order_by('-appointment_date')[:10]
-        }
-        return render(request, self.template_name, context)
+    def form_valid(self, form):
+        messages.success(self.request, 'Данные мастера успешно обновлены!')
+        return super().form_valid(form)
 
-class MasterScheduleView(LoginRequiredMixin, UserPassesTestMixin, View):
-    template_name = 'masters/schedule.html'
+class MasterDeleteView(DeleteView):
+    model = Master
+    template_name = 'master_confirm_delete.html'
+    success_url = reverse_lazy('master_list')
     
-    def test_func(self):
-        return is_master(self.request.user)
-    
-    def get(self, request):
-        master = request.user.master
-        # Get appointments for the next 7 days
-        start_date = timezone.now().date()
-        end_date = start_date + timedelta(days=7)
-        
-        appointments = Appointment.objects.filter(
-            master=master,
-            appointment_date__date__range=[start_date, end_date]
-        ).order_by('appointment_date')
-        
-        context = {
-            'master': master,
-            'appointments': appointments,
-            'date_range': [start_date + timedelta(days=i) for i in range(7)]
-        }
-        return render(request, self.template_name, context)
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, 'Мастер успешно удален!')
+        return super().delete(request, *args, **kwargs)
 
-class MasterClientHistoryView(LoginRequiredMixin, UserPassesTestMixin, View):
-    template_name = 'masters/client_history.html'
+# Service Views
+class ServiceListView(ListView):
+    model = Service
+    template_name = 'service_list.html'
+    context_object_name = 'services'
+    paginate_by = 15
     
-    def test_func(self):
-        return is_master(self.request.user)
+    def get_queryset(self):
+        queryset = Service.objects.filter(is_available=True)
+        
+        # Фильтрация по категории
+        category = self.request.GET.get('category')
+        if category:
+            queryset = queryset.filter(category=category)
+        
+        # Поиск
+        search = self.request.GET.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) |
+                Q(description__icontains=search)
+            )
+        
+        return queryset
     
-    def get(self, request, client_id):
-        master = request.user.master
-        client = get_object_or_404(Client, id=client_id)
-        
-        appointments = Appointment.objects.filter(
-            master=master,
-            client=client
-        ).order_by('-appointment_date')
-        
-        context = {
-            'client': client,
-            'appointments': appointments
-        }
-        return render(request, self.template_name, context)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['categories'] = Service.CATEGORY_CHOICES
+        return context
 
-class UpdateAppointmentStatusView(LoginRequiredMixin, UserPassesTestMixin, View):
+class ServiceDetailView(DetailView):
+    model = Service
+    template_name = 'service_detail.html'
+    context_object_name = 'service'
     
-    def test_func(self):
-        return is_master(self.request.user)
-    
-    def post(self, request, appointment_id):
-        appointment = get_object_or_404(Appointment, id=appointment_id)
-        
-        # Check if the appointment belongs to this master
-        if appointment.master != request.user.master:
-            return HttpResponseForbidden()
-        
-        new_status = request.POST.get('status')
-        if new_status in dict(Appointment.Status.choices):
-            appointment.status = new_status
-            appointment.save()
-            messages.success(request, f'Статус записи обновлен на {appointment.get_status_display()}')
-        else:
-            messages.error(request, 'Неверный статус')
-        
-        return redirect('master_dashboard')
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['masters'] = MasterService.objects.filter(
+            service=self.object, 
+            is_available=True
+        ).select_related('master')
+        return context
 
-# Administrator views
-@login_required
-@user_passes_test(is_administrator)
-def admin_dashboard(request):
-    # Admin dashboard statistics
-    today = timezone.now().date()
+class ServiceCreateView(CreateView):
+    model = Service
+    form_class = ServiceForm
+    template_name = 'service_form.html'
+    success_url = reverse_lazy('service_list')
     
+    def form_valid(self, form):
+        messages.success(self.request, 'Услуга успешно добавлена!')
+        return super().form_valid(form)
+
+class ServiceUpdateView(UpdateView):
+    model = Service
+    form_class = ServiceForm
+    template_name = 'service_form.html'
+    
+    def get_success_url(self):
+        return reverse_lazy('service_detail', kwargs={'pk': self.object.pk})
+    
+    def form_valid(self, form):
+        messages.success(self.request, 'Услуга успешно обновлена!')
+        return super().form_valid(form)
+
+class ServiceDeleteView(DeleteView):
+    model = Service
+    template_name = 'service_confirm_delete.html'
+    success_url = reverse_lazy('service_list')
+    
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, 'Услуга успешно удалена!')
+        return super().delete(request, *args, **kwargs)
+
+# MasterService Views
+class MasterServiceCreateView(CreateView):
+    model = MasterService
+    form_class = MasterServiceForm
+    template_name = 'masterservice_form.html'
+    
+    def get_success_url(self):
+        return reverse_lazy('master_detail', kwargs={'pk': self.object.master.pk})
+    
+    def form_valid(self, form):
+        messages.success(self.request, 'Услуга добавлена мастеру!')
+        return super().form_valid(form)
+
+class MasterServiceUpdateView(UpdateView):
+    model = MasterService
+    form_class = MasterServiceForm
+    template_name = 'masterservice_form.html'
+    
+    def get_success_url(self):
+        return reverse_lazy('master_detail', kwargs={'pk': self.object.master.pk})
+    
+    def form_valid(self, form):
+        messages.success(self.request, 'Услуга мастера обновлена!')
+        return super().form_valid(form)
+
+class MasterServiceDeleteView(DeleteView):
+    model = MasterService
+    template_name = 'masterservice_confirm_delete.html'
+    
+    def get_success_url(self):
+        return reverse_lazy('master_detail', kwargs={'pk': self.object.master.pk})
+    
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, 'Услуга удалена у мастера!')
+        return super().delete(request, *args, **kwargs)
+
+# Главная страница
+def home(request):
     context = {
-        'total_appointments_today': Appointment.objects.filter(
-            appointment_date__date=today
-        ).count(),
-        'pending_appointments': Appointment.objects.filter(
-            status='pending'
-        ).count(),
-        'total_clients': Client.objects.count(),
-        'total_masters': Master.objects.count(),
-        'recent_appointments': Appointment.objects.select_related(
-            'client', 'master', 'service'
-        ).order_by('-created_at')[:10]
+        'salons_count': Salon.objects.filter(is_active=True).count(),
+        'masters_count': Master.objects.filter(is_active=True).count(),
+        'services_count': Service.objects.filter(is_available=True).count(),
+        'top_masters': Master.objects.filter(is_active=True).order_by('-rating')[:5],
+        'popular_services': Service.objects.filter(is_available=True).annotate(
+            masters_count=Count('service_masters')
+        ).order_by('-masters_count')[:6],
     }
-    return render(request, 'admin/dashboard.html', context)
+    return render(request, 'home.html', context)
 
-@login_required
-@user_passes_test(is_administrator)
-def manage_appointments(request):
-    appointments = Appointment.objects.select_related(
-        'client', 'master', 'service'
-    ).order_by('-appointment_date')
+# Поиск по всему
+def search(request):
+    query = request.GET.get('q', '')
     
-    status_filter = request.GET.get('status')
-    if status_filter:
-        appointments = appointments.filter(status=status_filter)
-    
-    context = {
-        'appointments': appointments,
-        'status_choices': Appointment.Status.choices
-    }
-    return render(request, 'admin/manage_appointments.html', context)
-
-@login_required
-@user_passes_test(is_administrator)
-def manage_clients(request):
-    clients = Client.objects.select_related('user').all()
-    context = {'clients': clients}
-    return render(request, 'admin/manage_clients.html', context)
-
-@login_required
-@user_passes_test(is_administrator)
-def client_detail(request, client_id):
-    client = get_object_or_404(Client, id=client_id)
-    appointments = Appointment.objects.filter(client=client).order_by('-appointment_date')
-    reviews = Review.objects.filter(client=client)
-    
-    context = {
-        'client': client,
-        'appointments': appointments,
-        'reviews': reviews
-    }
-    return render(request, 'admin/client_detail.html', context)
-
-# API views for AJAX
-@login_required
-def get_master_schedule(request, master_id):
-    if not (is_client(request.user) or is_master(request.user) or is_administrator(request.user)):
-        return JsonResponse({'error': 'Access denied'}, status=403)
-    
-    master = get_object_or_404(Master, id=master_id)
-    date_str = request.GET.get('date')
-    
-    try:
-        date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.now().date()
-    except ValueError:
-        return JsonResponse({'error': 'Invalid date format'}, status=400)
-    
-    # Get working hours for the day
-    day_of_week = date.isoweekday()
-    working_hours = WorkingHours.objects.filter(master=master, day_of_week=day_of_week).first()
-    
-    # Get appointments for the day
-    appointments = Appointment.objects.filter(
-        master=master,
-        appointment_date__date=date,
-        status__in=['confirmed', 'pending']
-    )
-    
-    # Generate available time slots
-    available_slots = []
-    if working_hours and working_hours.is_working:
-        current_time = datetime.combine(date, working_hours.start_time)
-        end_time = datetime.combine(date, working_hours.end_time)
+    if query:
+        masters = Master.objects.filter(
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query) |
+            Q(specialization__icontains=query) |
+            Q(salon__name__icontains=query),
+            is_active=True
+        ).select_related('salon')
         
-        while current_time + timedelta(minutes=30) <= end_time:
-            slot_end = current_time + timedelta(minutes=30)
-            
-            # Check if slot is available
-            is_available = not appointments.filter(
-                appointment_date__lte=current_time,
-                appointment_date__gte=slot_end - timedelta(minutes=30)
-            ).exists()
-            
-            available_slots.append({
-                'start': current_time.strftime('%H:%M'),
-                'end': slot_end.strftime('%H:%M'),
-                'available': is_available
-            })
-            
-            current_time += timedelta(minutes=30)
-    
-    return JsonResponse({
-        'working_hours': {
-            'start': working_hours.start_time.strftime('%H:%M') if working_hours else None,
-            'end': working_hours.end_time.strftime('%H:%M') if working_hours else None,
-            'is_working': working_hours.is_working if working_hours else False
-        },
-        'available_slots': available_slots
-    })
-
-# Profile views
-@login_required
-def profile_view(request):
-    user = request.user
-    
-    if is_client(user):
-        return redirect('client_dashboard')
-    elif is_master(user):
-        return redirect('master_dashboard')
-    elif is_administrator(user):
-        return redirect('admin_dashboard')
+        services = Service.objects.filter(
+            Q(name__icontains=query) |
+            Q(description__icontains=query) |
+            Q(category__icontains=query),
+            is_available=True
+        )
+        
+        salons = Salon.objects.filter(
+            Q(name__icontains=query) |
+            Q(address__icontains=query),
+            is_active=True
+        )
     else:
-        return redirect('service_list')
-
-class ClientProfileUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
-    model = Client
-    form_class = ClientProfileForm
-    template_name = 'clients/update_profile.html'
-    success_url = reverse_lazy('client_dashboard')
+        masters = Master.objects.none()
+        services = Service.objects.none()
+        salons = Salon.objects.none()
     
-    def test_func(self):
-        return is_client(self.request.user)
+    context = {
+        'query': query,
+        'masters': masters,
+        'services': services,
+        'salons': salons,
+    }
     
-    def get_object(self):
-        return self.request.user.client
+    return render(request, 'search_results.html', context)

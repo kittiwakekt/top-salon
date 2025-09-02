@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ salon.name }} - Beauty Salon{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'salon:home' %}">Главная</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'salon:salon_list' %}">Салоны</a></li>
+        <li class="breadcrumb-item active">{{ salon.name }}</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h1 class="card-title">{{ salon.name }}</h1>
+                    <span class="badge bg-{% if salon.is_active %}success{% else %}secondary{% endif %}">
+                        {% if salon.is_active %}Активен{% else %}Неактивен{% endif %}
+                    </span>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p><strong><i class="bi bi-geo-alt"></i> Адрес:</strong><br>{{ salon.address }}</p>
+                        <p><strong><i class="bi bi-telephone"></i> Телефон:</strong><br>{{ salon.phone }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong><i class="bi bi-clock"></i> Часы работы:</strong><br>{{ salon.opening_time }} - {{ salon.closing_time }}</p>
+                    </div>
+                </div>
+                
+                <div class="btn-group">
+                    <a href="{% url 'salon:salon_update' salon.pk %}" class="btn btn-primary">Редактировать</a>
+                    <a href="{% url 'salon:salon_delete' salon.pk %}" class="btn btn-outline-danger">Удалить</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Мастера салона -->
+<div class="row mt-4">
+    <div class="col-12">
+        <h3 class="mb-4">Мастера этого салона</h3>
+        
+        {% if masters %}
+        <div class="row">
+            {% for master in masters %}
+            <div class="col-md-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ master.first_name }} {{ master.last_name }}</h5>
+                        <p class="text-muted">{{ master.get_specialization_display }}</p>
+                        <div class="rating mb-2">
+                            {% for i in "12345" %}
+                                {% if forloop.counter <= master.rating %}
+                                    <i class="bi bi-star-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-star"></i>
+                                {% endif %}
+                            {% endfor %}
+                            <span class="ms-1">({{ master.rating }})</span>
+                        </div>
+                        <p class="text-muted">Опыт: {{ master.experience }} лет</p>
+                        <a href="{% url 'salon:master_detail' master.pk %}" class="btn btn-outline-primary btn-sm">Подробнее</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            В этом салоне пока нет мастеров.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

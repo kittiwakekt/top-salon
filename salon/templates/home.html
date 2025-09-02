@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Главная - Beauty Salon{% endblock %}
+
+{% block content %}
+<!-- Герой секция -->
+<section class="hero-section text-center">
+    <div class="container">
+        <h1 class="hero-title">Добро пожаловать в Beauty Salon</h1>
+        <p class="hero-subtitle">Профессиональные услуги красоты от лучших мастеров</p>
+        <a href="{% url 'salon:service_list' %}" class="btn btn-light btn-lg">Наши услуги</a>
+    </div>
+</section>
+
+<!-- Статистика -->
+<section class="text-center mb-5">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="stats-number">{{ salons_count }}</div>
+            <div class="stats-label">Салоны</div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-number">{{ masters_count }}</div>
+            <div class="stats-label">Мастера</div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-number">{{ services_count }}</div>
+            <div class="stats-label">Услуги</div>
+        </div>
+    </div>
+</section>
+
+<!-- Лучшие мастера -->
+<section class="mb-5">
+    <h2 class="text-center mb-4">Наши лучшие мастера</h2>
+    <div class="row">
+        {% for master in top_masters %}
+        <div class="col-md-4">
+            <div class="card master-card">
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <i class="bi bi-person-circle icon-large"></i>
+                    </div>
+                    <h5 class="card-title">{{ master.first_name }} {{ master.last_name }}</h5>
+                    <p class="text-muted">{{ master.get_specialization_display }}</p>
+                    <div class="rating mb-2">
+                        {% for i in "12345" %}
+                            {% if forloop.counter <= master.rating %}
+                                <i class="bi bi-star-fill"></i>
+                            {% else %}
+                                <i class="bi bi-star"></i>
+                            {% endif %}
+                        {% endfor %}
+                        <span class="ms-1">({{ master.rating }})</span>
+                    </div>
+                    <p class="text-muted">{{ master.salon.name }}</p>
+                    <a href="{% url 'salon:master_detail' master.pk %}" class="btn btn-primary btn-sm">Подробнее</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Популярные услуги -->
+<section class="mb-5">
+    <h2 class="text-center mb-4">Популярные услуги</h2>
+    <div class="row">
+        {% for service in popular_services %}
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">{{ service.name }}</h5>
+                    <span class="badge bg-primary badge-custom">{{ service.get_category_display }}</span>
+                    <p class="card-text">{{ service.description|truncatewords:20 }}</p>
+                    <p class="card-text">
+                        <strong>{{ service.price }} руб.</strong>
+                        <span class="text-muted"> • {{ service.duration }} мин</span>
+                    </p>
+                    <a href="{% url 'salon:service_detail' service.pk %}" class="btn btn-outline-primary btn-sm">Подробнее</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

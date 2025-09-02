@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if form.instance.pk %}Редактировать{% else %}Добавить{% endif %} салон - Beauty Salon{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'salon:home' %}">Главная</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'salon:salon_list' %}">Салоны</a></li>
+        <li class="breadcrumb-item active">{% if form.instance.pk %}Редактировать{% else %}Добавить{% endif %}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h2>{% if form.instance.pk %}Редактировать салон{% else %}Добавить новый салон{% endif %}</h2>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.name.id_for_label }}" class="form-label">Название салона</label>
+                            {{ form.name }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.phone.id_for_label }}" class="form-label">Телефон</label>
+                            {{ form.phone }}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.address.id_for_label }}" class="form-label">Адрес</label>
+                        {{ form.address }}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.opening_time.id_for_label }}" class="form-label">Время открытия</label>
+                            {{ form.opening_time }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.closing_time.id_for_label }}" class="form-label">Время закрытия</label>
+                            {{ form.closing_time }}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        {{ form.is_active }}
+                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Активный</label>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'salon:salon_list' %}" class="btn btn-secondary me-md-2">Отмена</a>
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

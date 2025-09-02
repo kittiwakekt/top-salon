@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ service.name }} - Beauty Salon{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'salon:home' %}">Главная</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'salon:service_list' %}">Услуги</a></li>
+        <li class="breadcrumb-item active">{{ service.name }}</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h1 class="card-title">{{ service.name }}</h1>
+                    <span class="badge bg-primary badge-custom">{{ service.get_category_display }}</span>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <p><strong>Длительность:</strong> {{ service.duration }} минут</p>
+                        <p><strong>Цена:</strong> <span class="text-primary fs-5">{{ service.price }} руб.</span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Статус:</strong> 
+                            <span class="badge bg-{% if service.is_available %}success{% else %}secondary{% endif %}">
+                                {% if service.is_available %}Доступна{% else %}Недоступна{% endif %}
+                            </span>
+                        </p>
+                    </div>
+                </div>
+                
+                {% if service.description %}
+                <div class="mb-4">
+                    <h5>Описание:</h5>
+                    <p class="card-text">{{ service.description }}</p>
+                </div>
+                {% endif %}
+                
+                <div class="btn-group">
+                    <a href="{% url 'salon:service_update' service.pk %}" class="btn btn-primary">Редактировать</a>
+                    <a href="{% url 'salon:service_delete' service.pk %}" class="btn btn-outline-danger">Удалить</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Мастера, предоставляющие услугу -->
+<div class="row mt-4">
+    <div class="col-12">
+        <h3 class="mb-4">Мастера, предоставляющие эту услугу</h3>
+        
+        {% if masters %}
+        <div class="row">
+            {% for master_service in masters %}
+            <div class="col-md-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ master_service.master.first_name }} {{ master_service.master.last_name }}</h5>
+                        <p class="text-muted">{{ master_service.master.get_specialization_display }}</p>
+                        
+                        <div class="rating mb-2">
+                            {% for i in "12345" %}
+                                {% if forloop.counter <= master_service.master.rating %}
+                                    <i class="bi bi-star-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-star"></i>
+                                {% endif %}
+                            {% endfor %}
+                            <span class="ms-1">({{ master_service.master.rating }})</span>
+                        </div>
+                        
+                        <p class="card-text">
+                            <strong>Цена: </strong>
+                            {% if master_service.special_price %}
+                            <span class="special-price">{{ master_service.special_price }} руб.</span>
+                            <small class="original-price">{{ master_service.service.price }} руб.</small>
+                            {% else %}
+                            {{ master_service.service.price }} руб.
+                            {% endif %}
+                        </p>
+                        
+                        <p class="text-muted">
+                            <i class="bi bi-shop"></i> {{ master_service.master.salon.name }}
+                        </p>
+                        
+                        <a href="{% url 'salon:master_detail' master_service.master.pk %}" class="btn btn-outline-primary btn-sm">Профиль мастера</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            Эту услугу пока не предоставляет ни один мастер.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
