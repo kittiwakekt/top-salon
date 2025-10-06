@@ -90,7 +90,7 @@ else:
         'USER': config('DB_USER'),
         'PASSWORD': config('DB_PASS'),
         'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', de3fault='5432'),
+        'PORT': config('DB_PORT', default='5432'),
     }
 }
 
