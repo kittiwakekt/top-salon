@@ -1,13 +1,20 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Мастера - Beauty Salon{% endblock %}
+
+{% block local-style %}
+<link rel="stylesheet" href="{% static 'css/modal.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Наши мастера</h1>
-    <a href="{% url 'salon:master_create' %}" class="btn btn-primary">
-        <i class="bi bi-plus-circle"></i> Добавить мастера
-    </a>
+
+        <button type="button" class="btn btn-primary" onclick="openMasterModal()">
+            <i class="bi bi-plus-circle"></i> Добавить мастера
+        </button>
+
 </div>
 
 <!-- Фильтры -->
@@ -48,7 +55,7 @@
 </div>
 
 <!-- Список мастеров -->
-<div class="row">
+<div class="row" id="master-list">
     {% for master in masters %}
     <div class="col-md-4 mb-4">
         <div class="card h-100">
@@ -115,4 +122,11 @@
     </ul>
 </nav>
 {% endif %}
+
+{% include 'modals/master_form_modal.html' %}
+
+{% endblock %}
+
+{% block local-scripts %}
+<script src="{% static 'js/modal.js' %}"></script>
 {% endblock %}

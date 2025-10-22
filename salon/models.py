@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.exceptions import ValidationError
 
 class Salon(models.Model):
     name = models.CharField(max_length=100, verbose_name="Название салона")
@@ -9,6 +10,11 @@ class Salon(models.Model):
     closing_time = models.TimeField(verbose_name="Время закрытия")
     is_active = models.BooleanField(default=True, verbose_name="Активный")
 
+    def clean(self):
+        if len(self.name) > 100:
+            raise ValidationError('Используйте не более 100 символов')
+        
+    
     class Meta:
         verbose_name = "Салон"
         verbose_name_plural = "Салоны"
@@ -38,6 +44,7 @@ class Master(models.Model):
     is_active = models.BooleanField(default=True, verbose_name="Активный")
     hire_date = models.DateField(verbose_name="Дата приема на работу")
 
+    
     class Meta:
         verbose_name = "Мастер"
         verbose_name_plural = "Мастера"

@@ -35,4 +35,5 @@ urlpatterns = [
     path('master-services/create/', views.MasterServiceCreateView.as_view(), name='masterservice_create'),
     path('master-services/<int:pk>/update/', views.MasterServiceUpdateView.as_view(), name='masterservice_update'),
     path('master-services/<int:pk>/delete/', views.MasterServiceDeleteView.as_view(), name='masterservice_delete'),
+
 ]

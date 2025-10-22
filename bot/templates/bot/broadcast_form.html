@@ -1,0 +1,33 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>Отправить сообщение {{ users|length }} пользователям</h1>
+<form method="post">
+    {% csrf_token %}
+
+    <input type="hidden" name="action" value="send_distribution">
+    {% for user in users %}
+    <input type="hidden" name="_selected_action" value="{{ user.pk }}">
+    {% endfor %}
+
+    <textarea name="broadcast_text" rows="5" cols="60"></textarea>
+    <br>
+    <input type="submit" value="Отправить">
+    <a href="../">Отмена</a>
+</form>
+{% endblock %}
+
+
+1tmbhqz9yr
+
+NAME=myapp
+USER=myuser
+PASSWORD=secure_password
+HOST=localhost 
+PORT=5432
+
+
+8mv3yexg54
+
+
+mk

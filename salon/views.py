@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
+from django.http import JsonResponse
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 from django.contrib import messages
@@ -6,6 +7,8 @@ from django.db.models import Q, Avg, Count
 from django.core.paginator import Paginator
 from .models import Salon, Master, Service, MasterService
 from .forms import MasterForm, ServiceForm, SalonForm, MasterServiceForm
+from django.views.decorators.csrf import csrf_exempt
+from datetime import date
 
 # Salon Views
 class SalonListView(ListView):
@@ -64,7 +67,7 @@ class MasterListView(ListView):
     model = Master
     template_name = 'master_list.html'
     context_object_name = 'masters'
-    paginate_by = 12
+    paginate_by = 20
     
     def get_queryset(self):
         queryset = Master.objects.filter(is_active=True).select_related('salon')
@@ -257,9 +260,10 @@ def home(request):
         'masters_count': Master.objects.filter(is_active=True).count(),
         'services_count': Service.objects.filter(is_available=True).count(),
         'top_masters': Master.objects.filter(is_active=True).order_by('-rating')[:5],
-        'popular_services': Service.objects.filter(is_available=True).annotate(
-            masters_count=Count('service_masters')
-        ).order_by('-masters_count')[:6],
+        'popular_services': Service.objects
+            .filter(is_available=True)
+            .annotate(masters_count=Count('service_masters'))
+            .order_by('-masters_count')[:6],
     }
     return render(request, 'home.html', context)
 
@@ -301,3 +305,37 @@ def search(request):
     }
     
     return render(request, 'search_results.html', context)
+
+
+def add_master(request):
+
+    first_name = request.POST.get('first_name')
+    last_name = request.POST.get('last_name')
+    phone = request.POST.get('phone')
+    experience = request.POST.get('experience')
+
+
+    salon = request.POST.get('salon')
+    specialization = request.POST.get('specialization')
+    hire_date = date.today()
+
+    salon = Salon.objects.get(id=int(salon))
+
+    master = Master.objects.create(
+        first_name = first_name,
+        last_name = last_name,
+        experience = experience,
+        salon = salon,
+        specialization = specialization,
+        hire_date = hire_date
+    )
+    print(master)
+    master_serialised = {
+        'name': master.first_name + ' ' + master.last_name,
+        'specialization': master.get_specialization_display(),
+        'salon': master.salon.name,
+        'experience': master.experience,
+        'id': master.id,
+    }
+
+    return JsonResponse({'master': master_serialised}, status=200)

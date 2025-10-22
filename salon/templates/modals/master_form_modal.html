@@ -1,0 +1,60 @@
+
+<!-- Модальное окно для добавления мастера -->
+<div id="masterModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Добавить мастера</h2>
+        <form id="masterForm" class="modal-form" method="post" action="/api/master/add/">
+            {% csrf_token %}
+            <!-- Поля формы -->
+            <div class="form-group">
+                <label for="id_first_name">Имя *</label>
+                <input type="text" id="id_first_name" name="first_name" required>
+                <div class="error-message" id="firstNameError"></div>
+
+                <label for="id_last_name">Фамилия *</label>
+                <input type="text" id="id_last_name" name="last_name" required>
+                <div class="error-message" id="lastNameError"></div>
+
+                    <label for="id_specialization">Специализация</label>
+                    <select id="id_specialization" name="specialization" class="form-select">
+                        <option value="hair">
+                            Парикмахер
+                        </option>
+                        <option value="nails">
+                            Маникюр
+                        </option>
+                        <option value="cosmetology">
+                            Косметолог
+                        </option>
+                        <option value="massage">
+                            Массажист
+                        </option>
+                        <option value="barber">
+                            Барбер
+                        </option>
+                        
+                    </select>
+
+                    <label class="form-label">Салон</label>
+                    <select id="id_salon" name="salon" class="form-select">
+                        {% for salon in salons %}
+                        <option value="{{ salon.id }}" {% if request.GET.salon == salon.id|stringformat:"s" %}selected{% endif %}>
+                            {{ salon.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+    
+                <label for="id_experience">Опыт работы *</label>
+                <input type="number" id="id_experience" name="experience" required>
+                <div class="error-message" id="experienceError"></div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="btn-close">Отменить</button>
+                    <button type="submit" class="btn btn-primary">Добавить</button>
+                </div>
+            </div>
+            
+        </form>
+    </div>
+</div>

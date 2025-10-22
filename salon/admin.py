@@ -48,6 +48,8 @@ class MasterServiceAdmin(admin.ModelAdmin):
     list_editable = ('is_available',)
     autocomplete_fields = ('master', 'service')
     
+    actions = ['action_activate', 'action_deactivate']
+
     def get_price_display(self, obj):
         price = obj.get_price()
         if obj.special_price:
@@ -58,3 +60,15 @@ class MasterServiceAdmin(admin.ModelAdmin):
             )
         return f"{price} руб."
     get_price_display.short_description = 'Цена'
+
+    def action_activate(self, request, queryset):
+        """Активировать выбранных услуг мастеров"""
+        updated = queryset.update(is_available=True)
+        self.message_user(request, f"Активировано {updated} услуг мастеров")
+    action_activate.short_description = "Активировать выбранные услуги мастеров"
+
+    def action_deactivate(self, request, queryset):
+        """Деактивировать выбранных услуг мастеров"""
+        updated = queryset.update(is_available=False)
+        self.message_user(request, f"Деактивировано {updated} услуг мастеров")
+    action_deactivate.short_description = "Деактивировать выбранные услуги мастеров"

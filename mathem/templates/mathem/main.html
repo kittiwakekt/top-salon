@@ -1,0 +1,12 @@
+{% if client %}
+<h1>Hello, {{ client.first_name }} {{ client.last_name }}</h1>
+{% endif %}
+
+{% if form %}
+<form method="post" novalidate>
+    {% csrf_token %}
+    {{ form.as_p }}
+
+    <button type="submit">Send</button>
+</form>
+{% endif %}
